@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Fri 1 Main QR Entry Scanner</title>
+
+  <style>
+    :root {
+      /* Light mode colors (default) */
+      --bg-color: #f5f5f5;
+      --text-color: #333333;
+      --card-bg: #ffffff;
+      --card-text: #333333;
+      --border-color: #e0e0e0;
+      --button-primary: #2196f3;
+      --button-primary-hover: #1976d2;
+      --button-active: #f44336;
+      --button-active-hover: #d32f2f;
+      --status-idle-bg: #f0f0f0;
+      --status-idle-text: #333333;
+      --scanner-bg: #212121;
+      --header-color: #333333;
+      --small-text: #757575;
+      --empty-message: #757575;
+      --dialog-bg: #ffffff;
+      --dialog-text: #333333;
+      --overlay-bg: rgba(0,0,0,0.5);
+      --pause-overlay: rgba(0,0,0,0.7);
+      --debug-bg: rgba(0,0,0,0.7);
+      --switch-bg: #ccc;
+    }
+    [data-theme="dark"] {
+      /* Dark mode colors */
+      --bg-color: #121212;
+      --text-color: #f5f5f5;
+      --card-bg: #1e1e1e;
+      --card-text: #f5f5f5;
+      --border-color: #333333;
+      --button-primary: #1976d2;
+      --button-primary-hover: #1565c0;
+      --button-active: #c62828;
+      --button-active-hover: #b71c1c;
+      --status-idle-bg: #2c2c2c;
+      --status-idle-text: #f5f5f5;
+      --scanner-bg: #000000;
+      --header-color: #f5f5f5;
+      --small-text: #bbbbbb;
+      --empty-message: #aaaaaa;
+      --dialog-bg: #282828;
+      --dialog-text: #ffffff;
+      --overlay-bg: rgba(0,0,0,0.7);
+      --pause-overlay: rgba(0,0,0,0.85);
+      --debug-bg: rgba(0,0,0,0.85);
+      --switch-bg: #555;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+    }
+
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    .header-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      text-align: center;
+      margin: 0;
+      color: var(--header-color);
+      flex-grow: 1;
+    }
+
+    .theme-toggle {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background-color: var(--button-primary);
+      color: white;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .status-display {
+      width: 100%;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      transition: background-color 0.5s, color 0.3s;
+      text-align: center;
+      font-weight: 500;
+      background-color: var(--status-idle-bg);
+      color: var(--status-idle-text);
+    }
+
+    .status-idle { background-color: var(--status-idle-bg); color: var(--status-idle-text); }
+    .status-success { background-color: #4caf50; color: white; }
+    .status-error { background-color: #f44336; color: white; }
+    .status-loading { background-color: #ff9800; color: white; }
+    .status-warning { background-color: #ff9800; color: white; }
+    .status-paused { background-color: #607d8b; color: white; }
+    .status-reentry { background-color: #ffc107; color: black; }
+
+    .scanner-container {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1;
+      background-color: var(--scanner-bg);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .paused-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--pause-overlay);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: bold;
+      z-index: 10;
+    }
+
+    #debug-info {
+      background-color: var(--debug-bg);
+      color: #fff;
+      padding: 8px;
+      font-size: 12px;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-height: 100px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    .button {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      background-color: var(--button-primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .button:hover {
+      background-color: var(--button-primary-hover);
+    }
+
+    .button-active {
+      background-color: var(--button-active);
+    }
+    .button-active:hover {
+      background-color: var(--button-active-hover);
+    }
+
+    .button-flash-on {
+      background-color: #f59e0b;
+    }
+    .button-flash-on:hover {
+      background-color: #d97706;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .button-group .button {
+      margin-bottom: 0;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .small-button {
+      padding: 8px 12px;
+      background-color: #9e9e9e;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .manual-entry {
+      display: flex;
+      margin-bottom: 16px;
+    }
+
+    .manual-entry input {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px 0 0 8px;
+      font-size: 16px;
+      background-color: var(--card-bg);
+      color: var(--card-text);
+    }
+
+    .manual-entry button {
+      padding: 12px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 0 8px 8px 0;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .audio-control {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .audio-control label {
+      font-size: 14px;
+      color: var(--text-color);
+    }
+
+    .recent-scans {
+      width: 100%;
+      margin-top: 16px;
+    }
+    .recent-scans h2 {
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--header-color);
+    }
+    .scan-list {
+      background-color: var(--card-bg);
+      color: var(--card-text);
+      border-radius: 8px;
+      padding: 8px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .empty-message {
+      text-align: center;
+      color: var(--empty-message);
+      padding: 16px;
+    }
+    .scan-item {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+    }
+    .scan-item:last-child {
+      border-bottom: none;
+    }
+    .time {
+      font-size: 0.85em;
+      color: var(--small-text);
+    }
+
+    .permission-request {
+      background-color: #2196f3;
+      color: white;
+      text-align: center;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
+    .permission-request button {
+      background-color: white;
+      color: #2196f3;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      font-weight: bold;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Confirmation dialog */
+    .dialog-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--overlay-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .dialog {
+      background-color: var(--dialog-bg);
+      color: var(--dialog-text);
+      border-radius: 8px;
+      padding: 20px;
+      width: 300px;
+      max-width: 90%;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    .dialog-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .dialog-content {
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .dialog-buttons {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .dialog-button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .dialog-button-primary {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    .dialog-button-secondary {
+      background-color: #f44336;
+      color: white;
+    }
+
+    /* Toggle switch styles */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 24px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--switch-bg);
+      transition: .4s;
+      border-radius: 24px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: #2196F3;
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(16px);
+    }
+
+    .mode-indicator {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-left: 8px;
+    }
+
+    .mode-indicator-entry {
+      background-color: #4caf50;
+      color: white;
+    }
+
+    .mode-indicator-exit {
+      background-color: #f44336;
+      color: white;
+    }
+
+    /* PIN auth overlay */
+    #pin-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: var(--bg-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+    #pin-overlay.hidden {
+      display: none !important;
+    }
+    .pin-box {
+      background-color: var(--card-bg);
+      color: var(--card-text);
+      border-radius: 12px;
+      padding: 32px 24px;
+      width: 300px;
+      max-width: 90%;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+    .pin-box h2 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+    .pin-box p {
+      margin: 0 0 20px;
+      font-size: 14px;
+      color: var(--small-text);
+    }
+    #pin-input {
+      width: 100%;
+      padding: 12px;
+      font-size: 24px;
+      text-align: center;
+      letter-spacing: 6px;
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin-bottom: 16px;
+      outline: none;
+    }
+    #pin-input:focus {
+      border-color: var(--button-primary);
+    }
+    #pin-submit {
+      width: 100%;
+      padding: 12px;
+      background-color: var(--button-primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #pin-submit:hover {
+      background-color: var(--button-primary-hover);
+    }
+    #pin-error {
+      color: #f44336;
+      font-size: 14px;
+      margin-top: 12px;
+      min-height: 20px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Iframe / Permissions-Policy block detection -->
+  <div id="iframe-block" class="hidden" style="
+    position:fixed;top:0;left:0;right:0;bottom:0;
+    background:#1a1a2e;display:flex;align-items:center;justify-content:center;
+    z-index:9999;flex-direction:column;padding:24px;text-align:center;color:#fff;">
+    <div style="font-size:48px;margin-bottom:16px;">📷</div>
+    <h2 style="margin:0 0 12px;font-size:22px;">Camera Blocked</h2>
+    <p style="margin:0 0 24px;color:#aaa;max-width:320px;line-height:1.5;">
+      This page is running inside a frame which blocks camera access.<br><br>
+      Open it directly in its own tab to use the scanner.
+    </p>
+    <button id="open-in-tab-btn" style="
+      padding:14px 28px;background:#2196f3;color:#fff;border:none;
+      border-radius:8px;font-size:16px;cursor:pointer;">
+      Open in New Tab
+    </button>
+  </div>
+
+  <!-- PIN Authentication Overlay -->
+  <div id="pin-overlay">
+    <!-- Step 1: PIN entry -->
+    <div class="pin-box" id="pin-step">
+      <h2>🔒 Scanner Access</h2>
+      <p>Enter your PIN to continue</p>
+      <input type="password" id="pin-input" inputmode="numeric" maxlength="10" placeholder="••••" autocomplete="off">
+      <button id="pin-submit">Unlock</button>
+      <div id="pin-error"></div>
+    </div>
+    <!-- Step 2: direct tap starts camera (preserves user gesture for getUserMedia) -->
+    <div class="pin-box hidden" id="start-step">
+      <h2>✅ Access Granted</h2>
+      <p id="start-greeting"></p>
+      <button id="start-camera-btn">Start Scanner</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="header-container">
+      <h1>Fri 1 Main QR Entry Scanner</h1>
+      <button id="theme-toggle" class="theme-toggle">🌙</button>
+    </div>
+    <div id="operator-badge" style="text-align:center;margin-bottom:12px;font-size:13px;color:var(--small-text);display:none;">
+      Operator: <strong id="operator-name-display"></strong>
+    </div>
+
+    <div class="status-display status-idle" id="status">
+      Ready to scan
+    </div>
+
+    <!-- Permission request block -->
+    <div class="permission-request hidden" id="permission-request">
+      <p>This app needs camera access to scan QR codes</p>
+      <button id="grant-permission">Grant Camera Access</button>
+    </div>
+
+    <div class="scanner-container" id="scanner-container">
+      <video id="video" playsinline autoplay></video>
+      <div id="debug-info"></div>
+      <div class="paused-overlay hidden" id="paused-overlay">SCANNER PAUSED</div>
+    </div>
+
+    <!-- Scan mode selector -->
+    <div class="button-row">
+      <button class="button" id="temp-exit-btn">
+        Temporary Exit Mode
+        <span class="mode-indicator mode-indicator-entry" id="mode-indicator">ENTRY</span>
+      </button>
+    </div>
+
+    <div class="manual-entry">
+      <input type="text" id="manual-input" placeholder="Enter QR code manually...">
+      <button id="submit-manual">Submit</button>
+    </div>
+
+    <div class="audio-control">
+      <label for="sound-toggle">Sound:</label>
+      <label class="switch">
+        <input type="checkbox" id="sound-toggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="button-group">
+      <button class="button" id="pause-camera">Pause Scanner</button>
+      <button class="button" id="toggle-camera">Switch Camera</button>
+      <button class="button" id="flashlight-btn">&#x1F526; Flash</button>
+    </div>
+
+    <div class="recent-scans">
+      <h2>
+        Recent Scans
+        <button class="small-button" id="toggle-debug">Debug Mode</button>
+      </h2>
+      <div class="scan-list" id="scan-list">
+        <div class="empty-message">No items scanned yet</div>
+      </div>
+    </div>
+
+    <!-- Confirmation Dialog -->
+    <div class="dialog-overlay hidden" id="dialog-overlay">
+      <div class="dialog">
+        <div class="dialog-title" id="dialog-title">Confirm Temporary Exit</div>
+        <div class="dialog-content" id="dialog-content">
+          Do you want to mark this person as temporarily out?
+        </div>
+        <div class="dialog-buttons">
+          <button class="dialog-button dialog-button-secondary" id="dialog-cancel">Cancel</button>
+          <button class="dialog-button dialog-button-primary" id="dialog-confirm">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+  <script>
+    // ── GAS backend URL ────────────────────────────────────────────────────────
+    // Paste your Apps Script deployment URL here (the /exec URL).
+    const GAS_URL = 'YOUR_DEPLOYMENT_URL_HERE';
+
+    // JSONP — no CORS issues. GAS doGet returns: cbName({...})
+    // The <script> tag executes it, our window[cbName] callback fires.
+    function gasCall(payload) {
+      return new Promise(function(resolve, reject) {
+        var cbName = '_cb' + Date.now() + Math.random().toString(36).slice(2);
+        var script = document.createElement('script');
+
+        var timer = setTimeout(function() {
+          cleanup();
+          reject(new Error('Request timed out'));
+        }, 20000);
+
+        function cleanup() {
+          clearTimeout(timer);
+          delete window[cbName];
+          if (script.parentNode) script.parentNode.removeChild(script);
+        }
+
+        window[cbName] = function(data) { cleanup(); resolve(data); };
+        script.onerror = function() { cleanup(); reject(new Error('Network error')); };
+
+        var params = Object.assign({}, payload, { cb: cbName });
+        script.src = GAS_URL + '?' + Object.keys(params).map(function(k) {
+          return encodeURIComponent(k) + '=' + encodeURIComponent(params[k] != null ? params[k] : '');
+        }).join('&');
+
+        document.body.appendChild(script);
+      });
+    }
+    // ──────────────────────────────────────────────────────────────────────────
+  </script>
+
+  <script>
+    // Detect iframe / Permissions-Policy camera block before anything else runs
+    (function() {
+      const iframeBlock = document.getElementById('iframe-block');
+      const openBtn = document.getElementById('open-in-tab-btn');
+
+      function showIframeBlock() {
+        iframeBlock.classList.remove('hidden');
+        iframeBlock.style.display = 'flex';
+        document.getElementById('pin-overlay').style.display = 'none';
+      }
+
+      // If we're inside an iframe, camera will be blocked
+      if (window.self !== window.top) {
+        showIframeBlock();
+      } else {
+        // Also check Permissions Policy programmatically if supported
+        if (navigator.permissions) {
+          navigator.permissions.query({ name: 'camera' }).then(function(result) {
+            if (result.state === 'denied') showIframeBlock();
+          }).catch(function() {});
+        }
+      }
+
+      openBtn.addEventListener('click', function() {
+        window.open(window.location.href, '_blank');
+      });
+    })();
+  </script>
+
+  <script>
+    // Theme toggle functionality
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    const rootElement = document.documentElement;
+
+    // Check for saved theme preference or use device preference
+    const getCurrentTheme = () => {
+      const savedTheme = localStorage.getItem('qr-scanner-theme');
+      if (savedTheme) {
+        return savedTheme;
+      }
+      // Use device preference as fallback
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    };
+
+    // Set theme on initial load
+    const setTheme = (theme) => {
+      if (theme === 'dark') {
+        rootElement.setAttribute('data-theme', 'dark');
+        themeToggleBtn.innerHTML = '☀️'; // Sun icon for light mode toggle
+      } else {
+        rootElement.removeAttribute('data-theme');
+        themeToggleBtn.innerHTML = '🌙'; // Moon icon for dark mode toggle
+      }
+      localStorage.setItem('qr-scanner-theme', theme);
+    };
+
+    // Apply the current theme on page load
+    setTheme(getCurrentTheme());
+
+    // Toggle theme when button is clicked
+    themeToggleBtn.addEventListener('click', () => {
+      const currentTheme = rootElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      setTheme(currentTheme);
+    });
+
+    // Debug logging
+    const debugEl = document.getElementById('debug-info');
+    let debugMode = false;
+
+    function logDebug(message) {
+      debugEl.innerHTML += message + '<br>';
+      // Keep only the last 5 lines
+      const lines = debugEl.innerHTML.split('<br>');
+      if (lines.length > 5) {
+        debugEl.innerHTML = lines.slice(lines.length - 5).join('<br>');
+      }
+      console.log(message);
+    }
+
+    // Elements
+    const video = document.getElementById('video');
+    const statusEl = document.getElementById('status');
+    const scannerContainer = document.getElementById('scanner-container');
+    const permissionRequest = document.getElementById('permission-request');
+    const grantPermissionBtn = document.getElementById('grant-permission');
+    const toggleCameraBtn = document.getElementById('toggle-camera');
+    const pauseCameraBtn = document.getElementById('pause-camera');
+    const flashlightBtn = document.getElementById('flashlight-btn');
+    const scanList = document.getElementById('scan-list');
+    const manualInput = document.getElementById('manual-input');
+    const submitManualBtn = document.getElementById('submit-manual');
+    const toggleDebugBtn = document.getElementById('toggle-debug');
+    const pausedOverlay = document.getElementById('paused-overlay');
+    const soundToggle = document.getElementById('sound-toggle');
+    const tempExitBtn = document.getElementById('temp-exit-btn');
+    const modeIndicator = document.getElementById('mode-indicator');
+
+    // Dialog elements
+    const dialogOverlay = document.getElementById('dialog-overlay');
+    const dialogTitle = document.getElementById('dialog-title');
+    const dialogContent = document.getElementById('dialog-content');
+    const dialogConfirm = document.getElementById('dialog-confirm');
+    const dialogCancel = document.getElementById('dialog-cancel');
+
+    // Audio context for sound generation
+    let audioContext = null;
+
+    // Initialize audio context on first user interaction (required by browsers)
+    function initAudio() {
+      if (audioContext === null) {
+        try {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          if (debugMode) logDebug('Audio context initialized');
+        } catch (e) {
+          if (debugMode) logDebug('Error initializing audio: ' + e);
+        }
+      }
+    }
+
+    // Create a success beep sound
+    function playSuccessSound() {
+      if (!soundToggle.checked || !audioContext) return;
+
+      try {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(1800, audioContext.currentTime);
+        oscillator.frequency.setValueAtTime(2000, audioContext.currentTime + 0.1);
+
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+        gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.2);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.2);
+      } catch (e) {
+        if (debugMode) logDebug('Error playing success sound: ' + e);
+      }
+    }
+
+    // Create an error beep sound
+    function playErrorSound() {
+      if (!soundToggle.checked || !audioContext) return;
+
+      try {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
+
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+        gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime + 0.2);
+        gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.21);
+        gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.3);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.4);
+      } catch (e) {
+        if (debugMode) logDebug('Error playing error sound: ' + e);
+      }
+    }
+
+    // Create a warning sound for re-entry
+    function playWarningSound() {
+      if (!soundToggle.checked || !audioContext) return;
+
+      try {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(700, audioContext.currentTime);
+        oscillator.frequency.setValueAtTime(1200, audioContext.currentTime + 0.1);
+        oscillator.frequency.setValueAtTime(700, audioContext.currentTime + 0.2);
+
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+        gainNode.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 0.1);
+        gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.2);
+        gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.3);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.3);
+      } catch (e) {
+        if (debugMode) logDebug('Error playing warning sound: ' + e);
+      }
+    }
+
+    // State
+    let streaming = false;
+    let videoTrack = null;
+    let canvas = document.createElement('canvas');
+    let canvasContext = canvas.getContext('2d');
+    let scanning = false;
+    let isPaused = false;
+    let cooldown = false;
+    let animationFrame = null;
+    let isTempExitMode = false;
+    let pendingGuid = null;
+    let isFlashlightOn = false;
+    const scannedItems = {};
+    let currentCamera = 'environment';
+
+    // Make sure dialog is hidden initially
+    dialogOverlay.classList.add('hidden');
+
+    // Setup event listeners
+    grantPermissionBtn.addEventListener('click', function() {
+      initAudio();
+      initCamera();
+    });
+    toggleCameraBtn.addEventListener('click', function() {
+      initAudio();
+      toggleCamera();
+    });
+    submitManualBtn.addEventListener('click', function() {
+      initAudio();
+      handleManualInput();
+    });
+    pauseCameraBtn.addEventListener('click', function() {
+      initAudio();
+      togglePause();
+    });
+    flashlightBtn.addEventListener('click', toggleFlashlight);
+    toggleDebugBtn.addEventListener('click', toggleDebugMode);
+    soundToggle.addEventListener('change', function() {
+      initAudio();
+      if (debugMode) logDebug('Sound ' + (this.checked ? 'enabled' : 'disabled'));
+    });
+    tempExitBtn.addEventListener('click', toggleTempExitMode);
+    dialogConfirm.addEventListener('click', confirmTempExit);
+    dialogCancel.addEventListener('click', cancelTempExit);
+
+    // Initialize on first load
+    document.addEventListener('click', initAudio, { once: true });
+
+    // PIN authentication — camera only starts after successful auth
+    const pinOverlay = document.getElementById('pin-overlay');
+    const pinStep = document.getElementById('pin-step');
+    const startStep = document.getElementById('start-step');
+    const pinInput = document.getElementById('pin-input');
+    const pinSubmit = document.getElementById('pin-submit');
+    const pinError = document.getElementById('pin-error');
+    const startGreeting = document.getElementById('start-greeting');
+    const startCameraBtn = document.getElementById('start-camera-btn');
+    const operatorBadge = document.getElementById('operator-badge');
+    const operatorNameDisplay = document.getElementById('operator-name-display');
+
+    let currentOperator = '';
+
+    function attemptPinUnlock() {
+      const pin = pinInput.value.trim();
+      if (!pin) return;
+      pinSubmit.disabled = true;
+      pinSubmit.textContent = 'Checking...';
+      pinError.textContent = '';
+      gasCall({ action: 'validatePin', pin: pin })
+        .then(function(data) {
+          const operatorName = data.operatorName;
+          if (operatorName) {
+            currentOperator = operatorName;
+            startGreeting.textContent = 'Welcome, ' + operatorName + '!';
+            pinStep.classList.add('hidden');
+            startStep.classList.remove('hidden');
+          } else {
+            pinError.textContent = 'Incorrect PIN. Please try again.';
+            pinInput.value = '';
+            pinInput.focus();
+            pinSubmit.disabled = false;
+            pinSubmit.textContent = 'Unlock';
+          }
+        })
+        .catch(function(err) {
+          pinError.textContent = 'Error contacting server. Try again.';
+          pinSubmit.disabled = false;
+          pinSubmit.textContent = 'Unlock';
+        });
+    }
+
+    // Direct user gesture → initCamera() → getUserMedia prompt works
+    startCameraBtn.addEventListener('click', function() {
+      currentOperator && (operatorNameDisplay.textContent = currentOperator);
+      operatorBadge.style.display = 'block';
+      pinOverlay.classList.add('hidden');
+      initCamera();
+    });
+
+    pinSubmit.addEventListener('click', attemptPinUnlock);
+    pinInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') attemptPinUnlock();
+    });
+
+    // Focus the PIN input on load
+    pinInput.focus();
+
+    // Toggle flashlight (torch) on/off
+    async function toggleFlashlight() {
+      if (!videoTrack) {
+        if (debugMode) logDebug('Flashlight: no active camera track');
+        return;
+      }
+
+      // Check if torch is supported on this track
+      const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+      if (!capabilities.torch) {
+        if (debugMode) logDebug('Flashlight not supported on this device/camera');
+        // Show a brief message in the status without disrupting the scanner state
+        const prevClass = statusEl.className;
+        const prevText = statusEl.textContent;
+        updateStatus('error', 'Flashlight not supported on this device');
+        setTimeout(() => {
+          statusEl.className = prevClass;
+          statusEl.textContent = prevText;
+        }, 2000);
+        return;
+      }
+
+      isFlashlightOn = !isFlashlightOn;
+
+      try {
+        await videoTrack.applyConstraints({ advanced: [{ torch: isFlashlightOn }] });
+        if (isFlashlightOn) {
+          flashlightBtn.textContent = '\u{1F526} Flash: ON';
+          flashlightBtn.classList.add('button-flash-on');
+        } else {
+          flashlightBtn.textContent = '\u{1F526} Flash';
+          flashlightBtn.classList.remove('button-flash-on');
+        }
+        if (debugMode) logDebug('Flashlight: ' + (isFlashlightOn ? 'ON' : 'OFF'));
+      } catch (e) {
+        isFlashlightOn = false;
+        flashlightBtn.textContent = '\u{1F526} Flash';
+        flashlightBtn.classList.remove('button-flash-on');
+        if (debugMode) logDebug('Flashlight error: ' + e);
+      }
+    }
+
+    // Reset flashlight state (called when camera is switched or stopped)
+    function resetFlashlight() {
+      isFlashlightOn = false;
+      flashlightBtn.textContent = '\u{1F526} Flash';
+      flashlightBtn.classList.remove('button-flash-on');
+    }
+
+    // Toggle temporary exit mode
+    function toggleTempExitMode() {
+      isTempExitMode = !isTempExitMode;
+
+      if (isTempExitMode) {
+        tempExitBtn.classList.add('button-active');
+        modeIndicator.textContent = 'EXIT';
+        modeIndicator.classList.remove('mode-indicator-entry');
+        modeIndicator.classList.add('mode-indicator-exit');
+        updateStatus('warning', 'Temporary Exit Mode Active');
+      } else {
+        tempExitBtn.classList.remove('button-active');
+        modeIndicator.textContent = 'ENTRY';
+        modeIndicator.classList.remove('mode-indicator-exit');
+        modeIndicator.classList.add('mode-indicator-entry');
+        updateStatus('idle', 'Ready to scan');
+      }
+
+      if (debugMode) logDebug('Temp exit mode: ' + (isTempExitMode ? 'ON' : 'OFF'));
+    }
+
+    // Show confirmation dialog for temporary exit
+    function showConfirmDialog(guid) {
+      // Only proceed if we have a valid GUID
+      if (!guid) return;
+
+      pendingGuid = guid;
+      dialogTitle.textContent = 'Confirm Temporary Exit';
+      dialogContent.textContent = `Do you want to mark person with QR code ${guid} as temporarily out?`;
+      dialogOverlay.classList.remove('hidden');
+    }
+
+    // Confirm temporary exit
+    function confirmTempExit() {
+      if (!pendingGuid) return;
+
+      dialogOverlay.classList.add('hidden');
+      processTempExit(pendingGuid);
+      pendingGuid = null;
+    }
+
+    // Cancel temporary exit
+    function cancelTempExit() {
+      dialogOverlay.classList.add('hidden');
+      pendingGuid = null;
+      cooldown = false;
+    }
+
+    // Process temporary exit
+    function processTempExit(guid) {
+      updateStatus('loading', 'Processing temporary exit...');
+
+      if (debugMode) logDebug('Processing temp exit: ' + guid);
+
+      gasCall({ action: 'processTempExit', guid: guid, operator: currentOperator })
+        .then(function(data) {
+          if (debugMode) logDebug('Response: ' + JSON.stringify(data));
+
+          if (data.success) {
+            if (data.notRegistered) {
+              playErrorSound();
+              updateStatus('error', `Error: QR Code ${guid} was never registered!`);
+            } else {
+              playWarningSound();
+              updateStatus('warning', `QR Code ${guid} marked as temporarily out!`);
+              addToScanList(guid, 'out');
+            }
+          } else {
+            playErrorSound();
+            updateStatus('error', `Error: ${data.message || 'Unknown QR Code'}`);
+          }
+
+          setTimeout(() => {
+            cooldown = false;
+            if (!isPaused) {
+              updateStatus(isTempExitMode ? 'warning' : 'idle',
+                           isTempExitMode ? 'Temporary Exit Mode Active' : 'Ready to scan');
+            }
+          }, 1500);
+        })
+        .catch(function(error) {
+          if (debugMode) logDebug('Error: ' + error);
+          playErrorSound();
+          updateStatus('error', 'Server error, please try again');
+
+          setTimeout(() => {
+            cooldown = false;
+            if (!isPaused) {
+              updateStatus(isTempExitMode ? 'warning' : 'idle',
+                           isTempExitMode ? 'Temporary Exit Mode Active' : 'Ready to scan');
+            }
+          }, 1500);
+        });
+    }
+
+    // Toggle debug mode
+    function toggleDebugMode() {
+      debugMode = !debugMode;
+      debugEl.style.display = debugMode ? 'block' : 'none';
+      toggleDebugBtn.textContent = debugMode ? 'Hide Debug' : 'Debug Mode';
+
+      if (debugMode) {
+        logDebug('Debug mode enabled');
+      }
+    }
+
+    // Toggle pause/resume
+    function togglePause() {
+      isPaused = !isPaused;
+
+      if (isPaused) {
+        pauseCameraBtn.textContent = 'Resume Scanner';
+        pausedOverlay.classList.remove('hidden');
+        updateStatus('paused', 'Scanner paused');
+
+        // Cancel the animation frame if it's running
+        if (animationFrame) {
+          cancelAnimationFrame(animationFrame);
+          animationFrame = null;
+        }
+      } else {
+        pauseCameraBtn.textContent = 'Pause Scanner';
+        pausedOverlay.classList.add('hidden');
+        updateStatus(isTempExitMode ? 'warning' : 'idle',
+                     isTempExitMode ? 'Temporary Exit Mode Active' : 'Ready to scan');
+
+        // Restart scanning
+        if (scanning && !animationFrame) {
+          scanQRCode();
+        }
+      }
+    }
+
+    // Initialize camera
+    function initCamera() {
+      updateStatus('loading', 'Initializing camera...');
+      permissionRequest.classList.add('hidden');
+      scannerContainer.classList.remove('hidden');
+
+      if (debugMode) logDebug('Initializing camera...');
+
+      // Define constraints
+      const constraints = {
+        video: {
+          facingMode: currentCamera
+        }
+      };
+
+      // Try to get the camera stream
+      navigator.mediaDevices.getUserMedia(constraints)
+        .then(function(stream) {
+          if (debugMode) logDebug('Camera stream obtained');
+
+          videoTrack = stream.getVideoTracks()[0];
+          if (debugMode) logDebug('Camera: ' + videoTrack.label);
+
+          // Attach the stream to the video element
+          try {
+            video.srcObject = stream;
+          } catch (error) {
+            video.src = window.URL.createObjectURL(stream);
+            if (debugMode) logDebug('Using createObjectURL fallback');
+          }
+
+          video.onloadedmetadata = function() {
+            if (debugMode) logDebug('Video metadata loaded');
+
+            // Start the video
+            video.play()
+              .then(() => {
+                if (debugMode) logDebug('Video playing');
+                streaming = true;
+                startScanning();
+                updateStatus(isTempExitMode ? 'warning' : 'idle',
+                             isTempExitMode ? 'Temporary Exit Mode Active' : 'Ready to scan');
+              })
+              .catch(err => {
+                if (debugMode) logDebug('Error playing video: ' + err.message);
+                updateStatus('error', 'Error playing video. Please reload.');
+              });
+          };
+        })
+        .catch(function(err) {
+          if (debugMode) logDebug('Error getting camera: ' + err.message);
+          updateStatus('error', 'Camera access denied or not available');
+          permissionRequest.classList.remove('hidden');
+          scannerContainer.classList.add('hidden');
+        });
+    }
+
+    // Toggle between front and back cameras
+    function toggleCamera() {
+      if (videoTrack) {
+        videoTrack.stop();
+      }
+
+      // Reset flashlight state since the track is being replaced
+      resetFlashlight();
+
+      currentCamera = currentCamera === 'environment' ? 'user' : 'environment';
+      toggleCameraBtn.textContent = currentCamera === 'environment' ? 'Use Front Camera' : 'Use Back Camera';
+
+      if (debugMode) logDebug('Switching to ' + currentCamera + ' camera');
+      initCamera();
+    }
+
+    // Start QR code scanning
+    function startScanning() {
+      if (!streaming) return;
+
+      scanning = true;
+
+      // Set canvas size to match video dimensions
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      if (debugMode) logDebug('Canvas size: ' + canvas.width + 'x' + canvas.height);
+
+      // Start the scanning loop if not paused
+      if (!isPaused) {
+        scanQRCode();
+      }
+    }
+
+    // Scan for QR codes
+    function scanQRCode() {
+      if (!scanning || cooldown || isPaused) {
+        animationFrame = requestAnimationFrame(scanQRCode);
+        return;
+      }
+
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        // Draw the current video frame on the canvas
+        canvasContext.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Get the image data
+        const imageData = canvasContext.getImageData(0, 0, canvas.width, canvas.height);
+
+        // Scan for QR code
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+
+        // If a code is found
+        if (code) {
+          if (debugMode) logDebug('QR code detected: ' + code.data);
+
+          // Enter cooldown to prevent multiple scans
+          cooldown = true;
+
+          // Initialize audio if not already done
+          initAudio();
+
+          // Vibrate if supported (for mobile devices)
+          if (navigator.vibrate) {
+            navigator.vibrate(100);
+          }
+
+          // If in temporary exit mode, show confirmation dialog
+          if (isTempExitMode) {
+            showConfirmDialog(code.data);
+          } else {
+            // Otherwise process as normal entry/re-entry
+            processGuid(code.data);
+          }
+        }
+      }
+
+      // Continue scanning
+      animationFrame = requestAnimationFrame(scanQRCode);
+    }
+
+    // Handle manual input
+    function handleManualInput() {
+      const guid = manualInput.value.trim();
+
+      if (!guid) {
+        updateStatus('warning', 'Please enter a valid QR code');
+        return;
+      }
+
+      if (debugMode) logDebug('Manual input: ' + guid);
+
+      // If in temporary exit mode, show confirmation dialog
+      if (isTempExitMode) {
+        showConfirmDialog(guid);
+      } else {
+        // Otherwise process as normal entry/re-entry
+        processGuid(guid);
+      }
+
+      manualInput.value = '';
+    }
+
+    // Process the scanned GUID with Google Sheets
+    function processGuid(guid) {
+      updateStatus('loading', 'Processing entry...');
+
+      if (debugMode) logDebug('Processing: ' + guid);
+
+      gasCall({ action: 'processScannedGuid', guid: guid, operator: currentOperator })
+        .then(function(data) {
+          if (debugMode) logDebug('Response: ' + JSON.stringify(data));
+
+          if (data.success) {
+            if (data.alreadyEntered) {
+              playErrorSound();
+              updateStatus('error', `QR Code ${guid} was already scanned!`);
+            } else if (data.reentry) {
+              playWarningSound();
+              updateStatus('reentry', `QR Code ${guid} re-entered successfully after temporary exit!`);
+              addToScanList(guid, 'in');
+            } else {
+              playSuccessSound();
+              updateStatus('success', `QR Code ${guid} registered successfully!`);
+              addToScanList(guid, 'new');
+            }
+          } else {
+            playErrorSound();
+            updateStatus('error', `Error: ${data.message || 'Unknown QR Code'}`);
+          }
+
+          setTimeout(() => {
+            cooldown = false;
+            if (!isPaused) {
+              updateStatus(isTempExitMode ? 'warning' : 'idle',
+                           isTempExitMode ? 'Temporary Exit Mode Active' : 'Ready to scan');
+            }
+          }, 1500);
+        })
+        .catch(function(error) {
+          if (debugMode) logDebug('Error: ' + error);
+          playErrorSound();
+          updateStatus('error', 'Server error, please try again');
+
+          setTimeout(() => {
+            cooldown = false;
+            if (!isPaused) {
+              updateStatus(isTempExitMode ? 'warning' : 'idle',
+                           isTempExitMode ? 'Temporary Exit Mode Active' : 'Ready to scan');
+            }
+          }, 1500);
+        });
+    }
+
+    // Update status display
+    function updateStatus(type, message) {
+      statusEl.textContent = message;
+      statusEl.className = 'status-display status-' + type;
+    }
+
+    // Add scanned item to history
+    function addToScanList(guid, type) {
+      const timestamp = new Date().toISOString();
+      scannedItems[guid] = { timestamp, type };
+
+      // Clear empty message if present
+      const emptyMessage = scanList.querySelector('.empty-message');
+      if (emptyMessage) {
+        scanList.innerHTML = '';
+      }
+
+      // Create new item
+      const item = document.createElement('div');
+      item.className = 'scan-item';
+
+      let statusLabel = '';
+      if (type === 'out') {
+        statusLabel = '(OUT)';
+      } else if (type === 'in') {
+        statusLabel = '(IN)';
+      }
+
+      item.innerHTML = `
+        <span class="guid">${guid} ${statusLabel}</span>
+        <span class="time">${new Date(timestamp).toLocaleTimeString()}</span>
+      `;
+
+      // Add to list
+      scanList.prepend(item);
+    }
+  </script>
+</body>
+</html>
