@@ -516,6 +516,23 @@
       margin-top: 12px;
       min-height: 20px;
     }
+    .day-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .day-btn {
+      padding: 14px 8px;
+      background-color: var(--button-primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .day-btn:hover { background-color: var(--button-primary-hover); }
   </style>
 </head>
 <body>
@@ -539,8 +556,23 @@
 
   <!-- PIN Authentication Overlay -->
   <div id="pin-overlay">
+    <!-- Step 0: Day selection -->
+    <div class="pin-box" id="day-step">
+      <h2>Select Day</h2>
+      <p>Choose the event day for this scanner</p>
+      <div class="day-grid">
+        <button class="day-btn" data-day="Tuesday 1">Tuesday 1</button>
+        <button class="day-btn" data-day="Tuesday 2">Tuesday 2</button>
+        <button class="day-btn" data-day="Wednesday 1">Wednesday 1</button>
+        <button class="day-btn" data-day="Wednesday 2">Wednesday 2</button>
+        <button class="day-btn" data-day="Thursday 1">Thursday 1</button>
+        <button class="day-btn" data-day="Thursday 2">Thursday 2</button>
+        <button class="day-btn" data-day="Friday 1">Friday 1</button>
+        <button class="day-btn" data-day="Friday 2">Friday 2</button>
+      </div>
+    </div>
     <!-- Step 1: PIN entry -->
-    <div class="pin-box" id="pin-step">
+    <div class="pin-box hidden" id="pin-step">
       <h2>🔒 Scanner Access</h2>
       <p>Enter your PIN to continue</p>
       <input type="password" id="pin-input" inputmode="numeric" maxlength="10" placeholder="••••" autocomplete="off">
@@ -636,7 +668,17 @@
   <script>
     // ── GAS backend URL ────────────────────────────────────────────────────────
     // Paste your Apps Script deployment URL here (the /exec URL).
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyZrJ4iJPKCXeVjfRCQduU1Yn02K46mcZ4w2ydZtCbjPanrI-EqMJjBBJOp01U_M2IBGg/exec';
+    const DAY_URLS = {
+      'Tuesday 1':   'YOUR_TUE1_URL_HERE',
+      'Tuesday 2':   'YOUR_TUE2_URL_HERE',
+      'Wednesday 1': 'YOUR_WED1_URL_HERE',
+      'Wednesday 2': 'YOUR_WED2_URL_HERE',
+      'Thursday 1':  'YOUR_THU1_URL_HERE',
+      'Thursday 2':  'YOUR_THU2_URL_HERE',
+      'Friday 1':    'YOUR_FRI1_URL_HERE',
+      'Friday 2':    'YOUR_FRI2_URL_HERE'
+    };
+    let GAS_URL = '';
 
     // JSONP — no CORS issues. GAS doGet returns: cbName({...})
     // The <script> tag executes it, our window[cbName] callback fires.
@@ -923,6 +965,7 @@
 
     // PIN authentication — camera only starts after successful auth
     const pinOverlay = document.getElementById('pin-overlay');
+    const dayStep = document.getElementById('day-step');
     const pinStep = document.getElementById('pin-step');
     const startStep = document.getElementById('start-step');
     const pinInput = document.getElementById('pin-input');
@@ -934,6 +977,18 @@
     const operatorNameDisplay = document.getElementById('operator-name-display');
 
     let currentOperator = '';
+    let selectedDay = '';
+
+    // Day selection
+    document.querySelectorAll('.day-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        selectedDay = this.dataset.day;
+        GAS_URL = DAY_URLS[selectedDay] || '';
+        dayStep.classList.add('hidden');
+        pinStep.classList.remove('hidden');
+        pinInput.focus();
+      });
+    });
 
     function attemptPinUnlock() {
       const pin = pinInput.value.trim();
@@ -949,6 +1004,8 @@
             startGreeting.textContent = 'Welcome, ' + operatorName + '!';
             pinStep.classList.add('hidden');
             startStep.classList.remove('hidden');
+            // Warm up GAS now so the first scan has no cold-start delay
+            gasCall({ action: 'ping' }).catch(function() {});
           } else {
             pinError.textContent = 'Incorrect PIN. Please try again.';
             pinInput.value = '';
@@ -966,7 +1023,7 @@
 
     // Direct user gesture → initCamera() → getUserMedia prompt works
     startCameraBtn.addEventListener('click', function() {
-      currentOperator && (operatorNameDisplay.textContent = currentOperator);
+      operatorNameDisplay.textContent = selectedDay + ' — ' + currentOperator;
       operatorBadge.style.display = 'block';
       pinOverlay.classList.add('hidden');
       initCamera();
@@ -1331,7 +1388,6 @@
 
       gasCall({ action: 'processScannedGuid', guid: guid, operator: currentOperator })
         .then(function(data) {
-          console.log('[scan response]', JSON.stringify(data));
           if (debugMode) logDebug('Response: ' + JSON.stringify(data));
 
           if (data.success) {
