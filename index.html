@@ -724,16 +724,9 @@
         document.getElementById('pin-overlay').style.display = 'none';
       }
 
-      // If we're inside an iframe, camera will be blocked
+      // Only block if actually inside an iframe — on GitHub Pages camera works fine at top level
       if (window.self !== window.top) {
         showIframeBlock();
-      } else {
-        // Also check Permissions Policy programmatically if supported
-        if (navigator.permissions) {
-          navigator.permissions.query({ name: 'camera' }).then(function(result) {
-            if (result.state === 'denied') showIframeBlock();
-          }).catch(function() {});
-        }
       }
 
       openBtn.addEventListener('click', function() {
