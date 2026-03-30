@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Fri 1 Main QR Entry Scanner</title>
+  <title>QR Entry Scanner</title>
 
   <style>
     :root {
@@ -589,7 +589,7 @@
 
   <div class="container">
     <div class="header-container">
-      <h1>Fri 1 Main QR Entry Scanner</h1>
+      <h1 id="page-title">QR Entry Scanner</h1>
       <button id="theme-toggle" class="theme-toggle">🌙</button>
     </div>
     <div id="operator-badge" style="text-align:center;margin-bottom:12px;font-size:13px;color:var(--small-text);display:none;">
@@ -984,6 +984,8 @@
       btn.addEventListener('click', function() {
         selectedDay = this.dataset.day;
         GAS_URL = DAY_URLS[selectedDay] || '';
+        document.title = selectedDay + ' QR Entry Scanner';
+        document.getElementById('page-title').textContent = selectedDay + ' QR Entry Scanner';
         dayStep.classList.add('hidden');
         pinStep.classList.remove('hidden');
         pinInput.focus();
