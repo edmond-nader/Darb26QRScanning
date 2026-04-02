@@ -1526,7 +1526,7 @@
         setTimeout(function() {
           if (!isPaused) updateStatus(isTempExitMode ? 'warning' : 'idle',
                                       isTempExitMode ? 'Temporary Exit Mode Active' : 'Ready to scan');
-        }, 3000);
+        }, 4000);
         return;
       }
 
@@ -1546,6 +1546,11 @@
               if (data.entryBy)   alreadyMsg += '\nBy: ' + data.entryBy;
               if (data.entryTime) alreadyMsg += '\nAt: ' + data.entryTime;
               updateStatus('error', alreadyMsg);
+              setTimeout(function() {
+                if (!isPaused) updateStatus(isTempExitMode ? 'warning' : 'idle',
+                                            isTempExitMode ? 'Temporary Exit Mode Active' : 'Ready to scan');
+              }, 4000);
+              return;
             } else if (data.reentry) {
               playWarningSound();
               updateStatus('reentry', (name || guid) + ' re-entered after temporary exit!');
