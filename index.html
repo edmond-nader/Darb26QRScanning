@@ -711,7 +711,8 @@
     // JSONP — no CORS issues. GAS doGet returns: cbName({...})
     // The <script> tag executes it, our window[cbName] callback fires.
     function gasCall(payload) {
-      return new Promise(function(resolve, reject) {
+      var cancelled = false;
+      var promise = new Promise(function(resolve, reject) {
         var cbName = '_cb' + Date.now() + Math.random().toString(36).slice(2);
         var script = document.createElement('script');
 
@@ -726,8 +727,12 @@
           if (script.parentNode) script.parentNode.removeChild(script);
         }
 
-        window[cbName] = function(data) { cleanup(); resolve(data); };
-        script.onerror = function() { cleanup(); reject(new Error('Network error')); };
+        window[cbName] = function(data) {
+          if (cancelled) { cleanup(); return; }
+          cleanup();
+          resolve(data);
+        };
+        script.onerror = function() { cleanup(); if (!cancelled) reject(new Error('Network error')); };
 
         var params = Object.assign({}, payload, { cb: cbName });
         script.src = GAS_URL + '?' + Object.keys(params).map(function(k) {
@@ -736,6 +741,9 @@
 
         document.body.appendChild(script);
       });
+
+      promise.cancel = function() { cancelled = true; };
+      return promise;
     }
     // ──────────────────────────────────────────────────────────────────────────
   </script>
@@ -948,6 +956,8 @@
     let isTempExitMode = false;
     let pendingGuid = null;
     let isFlashlightOn = false;
+    let lastScannedGuid = null;  // prevents re-processing same QR while it's still in frame
+    let noQrFrames = 0;          // frames since last QR seen — resets lastScannedGuid after ~1.5s
     const scannedItems = {};
     let currentCamera = 'environment';
 
@@ -1004,6 +1014,7 @@
     let scanCache = {};     // { guid: { row, name, entered } }
     let cacheLoaded = false;
     let syncInterval = null;
+    let activeSyncCall = null;   // in-flight getSnapshot call — cancelled when a scan fires
 
     const syncBar   = document.getElementById('sync-bar');
     const syncLabel = document.getElementById('sync-label');
@@ -1039,10 +1050,10 @@
       if (syncInterval) clearTimeout(syncInterval);
       function scheduleSync() {
         syncInterval = setTimeout(function() {
-          // Skip sync if a scan is actively being processed — run after cooldown clears
           if (cooldown) { scheduleSync(); return; }
           setSyncState('syncing');
-          gasCall({ action: 'getSnapshot' })
+          activeSyncCall = gasCall({ action: 'getSnapshot' });
+          activeSyncCall
             .then(function(data) {
               Object.keys(data).forEach(function(guid) {
                 if (scanCache[guid]) {
@@ -1057,9 +1068,14 @@
               setTimeout(function() { setSyncState('idle'); }, 2000);
               if (debugMode) logDebug('Cache synced: ' + Object.keys(data).length + ' entries');
             })
-            .catch(function() { setSyncState('error'); setTimeout(function() { setSyncState('idle'); }, 3000); })
-            .finally(function() { scheduleSync(); }); // chain next sync after this one completes
-        }, 5000);
+            .catch(function() {
+              if (!activeSyncCall || !activeSyncCall.cancelled) {
+                setSyncState('error');
+                setTimeout(function() { setSyncState('idle'); }, 3000);
+              }
+            })
+            .finally(function() { activeSyncCall = null; scheduleSync(); });
+        }, 10000); // 10s between syncs — reduces contention with scans
       }
       scheduleSync();
     }
@@ -1432,26 +1448,37 @@
 
         // If a code is found
         if (code) {
-          if (debugMode) logDebug('QR code detected: ' + code.data);
-
-          // Enter cooldown to prevent multiple scans
-          cooldown = true;
-
-          // Initialize audio if not already done
-          initAudio();
-
-          // Vibrate if supported (for mobile devices)
-          if (navigator.vibrate) {
-            navigator.vibrate(100);
+          noQrFrames = 0;
+          // Skip if same QR still in frame from last scan
+          if (code.data === lastScannedGuid) {
+            animationFrame = requestAnimationFrame(scanQRCode);
+            return;
           }
 
-          // If in temporary exit mode, show confirmation dialog
+          if (debugMode) logDebug('QR code detected: ' + code.data);
+
+          lastScannedGuid = code.data;
+          cooldown = true;
+
+          // Abort any in-flight background sync so GAS is free to handle this scan
+          if (activeSyncCall) {
+            activeSyncCall.cancel();
+            activeSyncCall = null;
+            setSyncState('idle');
+          }
+
+          initAudio();
+          if (navigator.vibrate) navigator.vibrate(100);
+
           if (isTempExitMode) {
             showConfirmDialog(code.data);
           } else {
-            // Otherwise process as normal entry/re-entry
             processGuid(code.data);
           }
+        } else {
+          // No QR in frame — count frames; reset lastScannedGuid after ~1.5s (≈45 frames at 30fps)
+          noQrFrames++;
+          if (noQrFrames > 45) lastScannedGuid = null;
         }
       }
 
