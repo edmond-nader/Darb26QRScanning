@@ -74,6 +74,39 @@
       padding: 16px;
     }
 
+    .sync-bar {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      font-size: 12px;
+      color: var(--small-text);
+      margin-bottom: 6px;
+    }
+    .sync-bar.visible {
+      display: flex;
+    }
+    .sync-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--border-color);
+      border-top-color: #2196f3;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    .sync-bar.ok .sync-spinner {
+      border-top-color: #4caf50;
+      animation: none;
+    }
+    .sync-bar.error .sync-spinner {
+      border-top-color: #f44336;
+      animation: none;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
     .header-container {
       display: flex;
       align-items: center;
@@ -592,6 +625,10 @@
       <h1 id="page-title">QR Entry Scanner</h1>
       <button id="theme-toggle" class="theme-toggle">🌙</button>
     </div>
+    <div id="sync-bar" class="sync-bar">
+      <div class="sync-spinner"></div>
+      <span id="sync-label">Syncing...</span>
+    </div>
     <div id="operator-badge" style="text-align:center;margin-bottom:12px;font-size:13px;color:var(--small-text);display:none;">
       Operator: <strong id="operator-name-display"></strong>
     </div>
@@ -664,7 +701,7 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-  <script src="config.js"></script>
+  <script src="../config.js"></script>
 
   <script>
     // DAY_URLS loaded from config.js
@@ -962,6 +999,69 @@
     let currentOperator = '';
     let selectedDay = '';
 
+    // ── Local cache ────────────────────────────────────────────────────────────
+    let scanCache = {};     // { guid: { row, name, entered } }
+    let cacheLoaded = false;
+    let syncInterval = null;
+
+    const syncBar   = document.getElementById('sync-bar');
+    const syncLabel = document.getElementById('sync-label');
+
+    function setSyncState(state) {
+      // state: 'syncing' | 'ok' | 'error' | 'idle'
+      if (state === 'idle') {
+        syncBar.className = 'sync-bar';
+      } else {
+        syncBar.className = 'sync-bar visible ' + state;
+        syncLabel.textContent = state === 'syncing' ? 'Syncing...' : state === 'ok' ? 'Synced' : 'Sync error';
+      }
+    }
+
+    function loadSnapshot() {
+      setSyncState('syncing');
+      return gasCall({ action: 'getSnapshot' })
+        .then(function(data) {
+          scanCache = data;
+          cacheLoaded = true;
+          setSyncState('ok');
+          setTimeout(function() { setSyncState('idle'); }, 2000);
+          if (debugMode) logDebug('Cache loaded: ' + Object.keys(data).length + ' entries');
+        })
+        .catch(function(err) {
+          setSyncState('error');
+          setTimeout(function() { setSyncState('idle'); }, 3000);
+          if (debugMode) logDebug('Cache load failed: ' + err);
+        });
+    }
+
+    function startBackgroundSync() {
+      if (syncInterval) clearTimeout(syncInterval);
+      function scheduleSync() {
+        syncInterval = setTimeout(function() {
+          // Skip sync if a scan is actively being processed — run after cooldown clears
+          if (cooldown) { scheduleSync(); return; }
+          setSyncState('syncing');
+          gasCall({ action: 'getSnapshot' })
+            .then(function(data) {
+              Object.keys(data).forEach(function(guid) {
+                if (scanCache[guid]) {
+                  scanCache[guid].entered = data[guid].entered;
+                } else {
+                  scanCache[guid] = data[guid];
+                }
+              });
+              setSyncState('ok');
+              setTimeout(function() { setSyncState('idle'); }, 2000);
+              if (debugMode) logDebug('Cache synced: ' + Object.keys(data).length + ' entries');
+            })
+            .catch(function() { setSyncState('error'); setTimeout(function() { setSyncState('idle'); }, 3000); })
+            .finally(function() { scheduleSync(); }); // chain next sync after this one completes
+        }, 5000);
+      }
+      scheduleSync();
+    }
+    // ──────────────────────────────────────────────────────────────────────────
+
     // Day selection
     document.querySelectorAll('.day-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
@@ -991,6 +1091,8 @@
             startStep.classList.remove('hidden');
             // Warm up GAS now so the first scan has no cold-start delay
             gasCall({ action: 'ping' }).catch(function() {});
+            // Start loading snapshot in background so cache is ready by first scan
+            loadSnapshot();
           } else {
             pinError.textContent = 'Incorrect PIN. Please try again.';
             pinInput.value = '';
@@ -1011,6 +1113,7 @@
       operatorNameDisplay.textContent = selectedDay + ' — ' + currentOperator;
       operatorBadge.style.display = 'block';
       pinOverlay.classList.add('hidden');
+      startBackgroundSync();
       initCamera();
     });
 
@@ -1121,8 +1224,24 @@
 
     // Process temporary exit
     function processTempExit(guid) {
-      updateStatus('loading', 'Processing temporary exit...');
-      if (debugMode) logDebug('Processing temp exit: ' + guid);
+      const cached = scanCache[guid];
+      const name = cached ? cached.name : null;
+
+      if (debugMode) logDebug('Temp exit: ' + guid + (name ? ' (' + name + ')' : ''));
+
+      // Instant cache feedback — catch never-registered before GAS round trip
+      if (cached && cached.entered !== 'yes') {
+        playErrorSound();
+        updateStatus('error', 'Error: ' + (name || guid) + ' was never registered!');
+        setTimeout(function() { cooldown = false; }, 1500);
+        setTimeout(function() {
+          if (!isPaused) updateStatus(isTempExitMode ? 'warning' : 'idle',
+                                      isTempExitMode ? 'Temporary Exit Mode Active' : 'Ready to scan');
+        }, 3000);
+        return;
+      }
+
+      updateStatus('loading', name ? 'Processing exit: ' + name + '...' : 'Processing temporary exit...');
 
       // Unlock scanner after fixed time — do NOT reset status here
       setTimeout(function() { cooldown = false; }, 1500);
@@ -1130,18 +1249,19 @@
       gasCall({ action: 'processTempExit', guid: guid, operator: currentOperator })
         .then(function(data) {
           if (debugMode) logDebug('Response: ' + JSON.stringify(data));
+          if (cached && data.success && !data.notRegistered) cached.entered = 'temporarilyOut';
           if (data.success) {
             if (data.notRegistered) {
               playErrorSound();
-              updateStatus('error', `Error: QR Code ${guid} was never registered!`);
+              updateStatus('error', 'Error: ' + (name || guid) + ' was never registered!');
             } else {
               playWarningSound();
-              updateStatus('warning', `QR Code ${guid} marked as temporarily out!`);
+              updateStatus('warning', (name || guid) + ' marked as temporarily out!');
               addToScanList(guid, 'out');
             }
           } else {
             playErrorSound();
-            updateStatus('error', `Error: ${data.message || 'Unknown QR Code'}`);
+            updateStatus('error', 'Error: ' + (data.message || 'Unknown QR Code'));
           }
           setTimeout(function() {
             if (!isPaused) updateStatus(isTempExitMode ? 'warning' : 'idle',
@@ -1358,9 +1478,26 @@
       manualInput.value = '';
     }
 
+    // Process the scanned GUID with Google Sheets
     function processGuid(guid) {
-      updateStatus('loading', 'Processing entry...');
-      if (debugMode) logDebug('Processing: ' + guid);
+      const cached = scanCache[guid];
+      const name = cached ? cached.name : null;
+
+      if (debugMode) logDebug('Processing: ' + guid + (name ? ' (' + name + ')' : ''));
+
+      // Instant cache feedback — show name and catch already-entered before GAS round trip
+      if (cached && cached.entered === 'yes') {
+        playErrorSound();
+        updateStatus('error', (name || guid) + ' was already scanned!');
+        setTimeout(function() { cooldown = false; }, 1500);
+        setTimeout(function() {
+          if (!isPaused) updateStatus(isTempExitMode ? 'warning' : 'idle',
+                                      isTempExitMode ? 'Temporary Exit Mode Active' : 'Ready to scan');
+        }, 3000);
+        return;
+      }
+
+      updateStatus('loading', name ? 'Processing: ' + name + '...' : 'Processing entry...');
 
       // Unlock scanner after fixed time — do NOT reset status here
       setTimeout(function() { cooldown = false; }, 1500);
@@ -1368,22 +1505,23 @@
       gasCall({ action: 'processScannedGuid', guid: guid, operator: currentOperator })
         .then(function(data) {
           if (debugMode) logDebug('Response: ' + JSON.stringify(data));
+          if (cached) cached.entered = data.alreadyEntered ? 'yes' : (data.success ? 'yes' : cached.entered);
           if (data.success) {
             if (data.alreadyEntered) {
               playErrorSound();
-              updateStatus('error', `QR Code ${guid} was already scanned!`);
+              updateStatus('error', (name || guid) + ' was already scanned!');
             } else if (data.reentry) {
               playWarningSound();
-              updateStatus('reentry', `QR Code ${guid} re-entered successfully after temporary exit!`);
+              updateStatus('reentry', (name || guid) + ' re-entered after temporary exit!');
               addToScanList(guid, 'in');
             } else {
               playSuccessSound();
-              updateStatus('success', `QR Code ${guid} registered successfully!`);
+              updateStatus('success', (name || guid) + ' registered successfully!');
               addToScanList(guid, 'new');
             }
           } else {
             playErrorSound();
-            updateStatus('error', `Error: ${data.message || 'Unknown QR Code'}`);
+            updateStatus('error', 'Error: ' + (data.message || 'Unknown QR Code'));
           }
           setTimeout(function() {
             if (!isPaused) updateStatus(isTempExitMode ? 'warning' : 'idle',
