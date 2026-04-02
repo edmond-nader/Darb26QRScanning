@@ -664,10 +664,20 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-  <script src="config.js"></script>
 
   <script>
-    // DAY_URLS loaded from config.js
+    // ── GAS backend URL ────────────────────────────────────────────────────────
+    // Paste your Apps Script deployment URL here (the /exec URL).
+    const DAY_URLS = {
+      'Tuesday 1':   'https://script.google.com/macros/s/AKfycbxtVaxChZ_Qu56isgZQiRpyEUw1-FsuthgGJfNlFkLF1RZHc3RB8VBc78Pb6YrwF5EV/exec',
+      'Tuesday 2':   'https://script.google.com/macros/s/AKfycbxq-PXVTekjzxN45yGH5qh6P354zvs0Oai8h7xe-_Y_XGadFvAXahT42Ta9P_a6SBkHkA/exec',
+      'Wednesday 1': 'https://script.google.com/macros/s/AKfycbwiCXq3J8uyZbNvURf8TNzlSLTQ8OweEJ4vjSoURv4WrCNbD99pqhEJ7ZHlmiFEubOHUw/exec',
+      'Wednesday 2': 'https://script.google.com/macros/s/AKfycbzjNK-KZVxGrK911QwsfJRh7LdyINYskWJeow56_BOjEJBxX2yiulm9gW3dw-ETNecr/exec',
+      'Thursday 1':  'https://script.google.com/macros/s/AKfycbwuEh_2pHZhjFu1pBBVs8wNnX6QaJXJs_WVJ21OE41j9V_b5ckqPlr4sFN3S53DvmMb/exec',
+      'Thursday 2':  'YOUR_THU2_URL_HERE',
+      'Friday 1':    'YOUR_FRI1_URL_HERE',
+      'Friday 2':    'YOUR_FRI2_URL_HERE'
+    };
     let GAS_URL = '';
 
     // JSONP — no CORS issues. GAS doGet returns: cbName({...})
@@ -1122,17 +1132,13 @@
     // Process temporary exit
     function processTempExit(guid) {
       updateStatus('loading', 'Processing temporary exit...');
-      if (debugMode) logDebug('Processing temp exit: ' + guid);
 
-      setTimeout(function() {
-        cooldown = false;
-        if (!isPaused) updateStatus(isTempExitMode ? 'warning' : 'idle',
-                                    isTempExitMode ? 'Temporary Exit Mode Active' : 'Ready to scan');
-      }, 1500);
+      if (debugMode) logDebug('Processing temp exit: ' + guid);
 
       gasCall({ action: 'processTempExit', guid: guid, operator: currentOperator })
         .then(function(data) {
           if (debugMode) logDebug('Response: ' + JSON.stringify(data));
+
           if (data.success) {
             if (data.notRegistered) {
               playErrorSound();
@@ -1146,11 +1152,27 @@
             playErrorSound();
             updateStatus('error', `Error: ${data.message || 'Unknown QR Code'}`);
           }
+
+          setTimeout(() => {
+            cooldown = false;
+            if (!isPaused) {
+              updateStatus(isTempExitMode ? 'warning' : 'idle',
+                           isTempExitMode ? 'Temporary Exit Mode Active' : 'Ready to scan');
+            }
+          }, 1500);
         })
         .catch(function(error) {
           if (debugMode) logDebug('Error: ' + error);
           playErrorSound();
           updateStatus('error', 'Server error, please try again');
+
+          setTimeout(() => {
+            cooldown = false;
+            if (!isPaused) {
+              updateStatus(isTempExitMode ? 'warning' : 'idle',
+                           isTempExitMode ? 'Temporary Exit Mode Active' : 'Ready to scan');
+            }
+          }, 1500);
         });
     }
 
@@ -1353,21 +1375,16 @@
       manualInput.value = '';
     }
 
+    // Process the scanned GUID with Google Sheets
     function processGuid(guid) {
       updateStatus('loading', 'Processing entry...');
-      if (debugMode) logDebug('Processing: ' + guid);
 
-      // Reset cooldown after fixed time — scanner ready for next scan
-      // regardless of how long GAS takes to respond
-      setTimeout(function() {
-        cooldown = false;
-        if (!isPaused) updateStatus(isTempExitMode ? 'warning' : 'idle',
-                                    isTempExitMode ? 'Temporary Exit Mode Active' : 'Ready to scan');
-      }, 1500);
+      if (debugMode) logDebug('Processing: ' + guid);
 
       gasCall({ action: 'processScannedGuid', guid: guid, operator: currentOperator })
         .then(function(data) {
           if (debugMode) logDebug('Response: ' + JSON.stringify(data));
+
           if (data.success) {
             if (data.alreadyEntered) {
               playErrorSound();
@@ -1385,11 +1402,27 @@
             playErrorSound();
             updateStatus('error', `Error: ${data.message || 'Unknown QR Code'}`);
           }
+
+          setTimeout(() => {
+            cooldown = false;
+            if (!isPaused) {
+              updateStatus(isTempExitMode ? 'warning' : 'idle',
+                           isTempExitMode ? 'Temporary Exit Mode Active' : 'Ready to scan');
+            }
+          }, 1500);
         })
         .catch(function(error) {
           if (debugMode) logDebug('Error: ' + error);
           playErrorSound();
           updateStatus('error', 'Server error, please try again');
+
+          setTimeout(() => {
+            cooldown = false;
+            if (!isPaused) {
+              updateStatus(isTempExitMode ? 'warning' : 'idle',
+                           isTempExitMode ? 'Temporary Exit Mode Active' : 'Ready to scan');
+            }
+          }, 1500);
         });
     }
 
