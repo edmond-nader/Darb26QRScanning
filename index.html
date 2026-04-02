@@ -567,6 +567,57 @@
       cursor: pointer;
     }
     .day-btn:hover { background-color: var(--button-primary-hover); }
+    .day-btn.active-day {
+      background-color: #388e3c;
+      outline: 3px solid #a5d6a7;
+    }
+    .day-btn.active-day:hover { background-color: #2e7d32; }
+
+    .change-day-btn {
+      margin-left: 10px;
+      padding: 3px 10px;
+      font-size: 11px;
+      background: transparent;
+      border: 1px solid var(--small-text);
+      border-radius: 12px;
+      color: var(--small-text);
+      cursor: pointer;
+      vertical-align: middle;
+    }
+    .change-day-btn:hover { background: var(--border-color); }
+
+    .day-switch-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: var(--overlay-bg);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .day-switch-overlay.visible { display: flex; }
+    .day-switch-box {
+      background: var(--card-bg);
+      color: var(--card-text);
+      border-radius: 12px;
+      padding: 24px 20px 20px;
+      width: min(360px, 90vw);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    .day-switch-box h2 { margin: 0 0 6px; font-size: 18px; }
+    .day-switch-box p  { margin: 0 0 16px; font-size: 13px; color: var(--small-text); }
+    .day-switch-cancel {
+      margin-top: 14px;
+      width: 100%;
+      padding: 10px;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-color);
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .day-switch-cancel:hover { background: var(--border-color); }
   </style>
 </head>
 <body>
@@ -632,6 +683,7 @@
     </div>
     <div id="operator-badge" style="text-align:center;margin-bottom:12px;font-size:13px;color:var(--small-text);display:none;">
       Operator: <strong id="operator-name-display"></strong>
+      <button class="change-day-btn" id="change-day-btn">Change Day</button>
     </div>
 
     <div class="status-display status-idle" id="status">
@@ -684,6 +736,25 @@
       </h2>
       <div class="scan-list" id="scan-list">
         <div class="empty-message">No items scanned yet</div>
+      </div>
+    </div>
+
+    <!-- Day Switch Modal -->
+    <div class="day-switch-overlay" id="day-switch-overlay">
+      <div class="day-switch-box">
+        <h2>Switch Day</h2>
+        <p>Select a new day — camera stays on</p>
+        <div class="day-grid" id="day-switch-grid">
+          <button class="day-btn" data-day="Tuesday 1">Tuesday 1</button>
+          <button class="day-btn" data-day="Tuesday 2">Tuesday 2</button>
+          <button class="day-btn" data-day="Wednesday 1">Wednesday 1</button>
+          <button class="day-btn" data-day="Wednesday 2">Wednesday 2</button>
+          <button class="day-btn" data-day="Thursday 1">Thursday 1</button>
+          <button class="day-btn" data-day="Thursday 2">Thursday 2</button>
+          <button class="day-btn" data-day="Friday 1">Friday 1</button>
+          <button class="day-btn" data-day="Friday 2">Friday 2</button>
+        </div>
+        <button class="day-switch-cancel" id="day-switch-cancel">Cancel</button>
       </div>
     </div>
 
@@ -1135,6 +1206,56 @@
       startBackgroundSync();
       initCamera();
     });
+
+    // ── Day switcher ──────────────────────────────────────────────────────────
+    const daySwitchOverlay = document.getElementById('day-switch-overlay');
+    const daySwitchCancel  = document.getElementById('day-switch-cancel');
+
+    function openDaySwitcher() {
+      // Highlight the currently active day
+      document.querySelectorAll('#day-switch-grid .day-btn').forEach(function(btn) {
+        btn.classList.toggle('active-day', btn.dataset.day === selectedDay);
+      });
+      daySwitchOverlay.classList.add('visible');
+    }
+
+    function closeDaySwitcher() {
+      daySwitchOverlay.classList.remove('visible');
+    }
+
+    document.getElementById('change-day-btn').addEventListener('click', openDaySwitcher);
+    daySwitchCancel.addEventListener('click', closeDaySwitcher);
+
+    document.querySelectorAll('#day-switch-grid .day-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var newDay = this.dataset.day;
+        if (newDay === selectedDay) { closeDaySwitcher(); return; }
+
+        // Abort any in-flight sync before switching
+        if (activeSyncCall) { activeSyncCall.cancel(); activeSyncCall = null; }
+        if (syncInterval)   { clearTimeout(syncInterval); syncInterval = null; }
+        setSyncState('idle');
+
+        // Switch day
+        selectedDay = newDay;
+        GAS_URL = DAY_URLS[selectedDay] || '';
+        document.title = selectedDay + ' QR Entry Scanner';
+        document.getElementById('page-title').textContent = selectedDay + ' QR Entry Scanner';
+        operatorNameDisplay.textContent = selectedDay + ' — ' + currentOperator;
+
+        // Clear cache — no overlap: all new scans use the new GAS_URL
+        scanCache = {};
+        cacheLoaded = false;
+        lastScannedGuid = null;
+
+        closeDaySwitcher();
+
+        // Reload cache and restart sync for new day
+        loadSnapshot();
+        startBackgroundSync();
+      });
+    });
+    // ─────────────────────────────────────────────────────────────────────────
 
     pinSubmit.addEventListener('click', attemptPinUnlock);
     pinInput.addEventListener('keydown', function(e) {
