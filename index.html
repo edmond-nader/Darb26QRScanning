@@ -143,6 +143,7 @@
       transition: background-color 0.5s, color 0.3s;
       text-align: center;
       font-weight: 500;
+      white-space: pre-line;
       background-color: var(--status-idle-bg);
       color: var(--status-idle-text);
     }
@@ -1045,7 +1046,9 @@
             .then(function(data) {
               Object.keys(data).forEach(function(guid) {
                 if (scanCache[guid]) {
-                  scanCache[guid].entered = data[guid].entered;
+                  scanCache[guid].entered   = data[guid].entered;
+                  scanCache[guid].entryTime = data[guid].entryTime;
+                  scanCache[guid].entryBy   = data[guid].entryBy;
                 } else {
                   scanCache[guid] = data[guid];
                 }
@@ -1488,7 +1491,10 @@
       // Instant cache feedback — show name and catch already-entered before GAS round trip
       if (cached && cached.entered === 'yes') {
         playErrorSound();
-        updateStatus('error', (name || guid) + ' was already scanned!');
+        var alreadyMsg = (name || guid) + ' was already scanned!';
+        if (cached.entryBy)   alreadyMsg += '\nBy: ' + cached.entryBy;
+        if (cached.entryTime) alreadyMsg += '\nAt: ' + cached.entryTime;
+        updateStatus('error', alreadyMsg);
         setTimeout(function() { cooldown = false; }, 1500);
         setTimeout(function() {
           if (!isPaused) updateStatus(isTempExitMode ? 'warning' : 'idle',
@@ -1509,7 +1515,10 @@
           if (data.success) {
             if (data.alreadyEntered) {
               playErrorSound();
-              updateStatus('error', (name || guid) + ' was already scanned!');
+              var alreadyMsg = (name || guid) + ' was already scanned!';
+              if (data.entryBy)   alreadyMsg += '\nBy: ' + data.entryBy;
+              if (data.entryTime) alreadyMsg += '\nAt: ' + data.entryTime;
+              updateStatus('error', alreadyMsg);
             } else if (data.reentry) {
               playWarningSound();
               updateStatus('reentry', (name || guid) + ' re-entered after temporary exit!');
