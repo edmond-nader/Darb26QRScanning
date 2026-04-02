@@ -5,7 +5,7 @@ var DAY_URLS = {
   'Tuesday 2':   'YOUR_TUE2_URL_HERE',
   'Wednesday 1': 'YOUR_WED1_URL_HERE',
   'Wednesday 2': 'YOUR_WED2_URL_HERE',
-  'Thursday 1':  'https://script.google.com/macros/s/AKfycbzU-ZN0i4FMbPhZH_S1-KHx4j59ALFA6y-Gg5a7AOukV0aOjF3aUh8CF0dLNoIlxHIf/exec',
+  'Thursday 1':  'https://script.google.com/macros/s/AKfycbztaebaWfOeszc6f7ukykQHUO6ysUWko5Zsttai-CUfoadM6sWQIGkBiXp1-qeQwXwV/exec',
   'Thursday 2':  'https://script.google.com/macros/s/AKfycbyKD30xjK9MIVmW_iNg-uqaqr6X1-i6e880ev5Gy-zhRWZ1JNbTSyjxrwLwPmzK1aHS/exec',
   'Friday 1':    'YOUR_FRI1_URL_HERE',
   'Friday 2':    'YOUR_FRI2_URL_HERE'
