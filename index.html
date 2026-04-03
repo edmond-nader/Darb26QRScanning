@@ -1080,36 +1080,37 @@
     flashlightBtn.addEventListener('click', toggleFlashlight);
     toggleDebugBtn.addEventListener('click', toggleDebugMode);
 
-    // Entered count button
+    // Entered count button — computed from local cache, no GAS call needed
     const enteredCountBtn     = document.getElementById('entered-count-btn');
     const enteredCountDisplay = document.getElementById('entered-count-display');
     const countTotal          = document.getElementById('count-total');
     const countMale           = document.getElementById('count-male');
     const countFemale         = document.getElementById('count-female');
     enteredCountBtn.addEventListener('click', function() {
-      enteredCountBtn.disabled = true;
-      enteredCountBtn.textContent = '...';
-      activeCountCall = gasCall({ action: 'getEnteredCount' });
-      activeCountCall
-        .then(function(data) {
-          countTotal.textContent = data.total + ' total';
-          countMale.textContent  = data.male + ' male';
-          countFemale.textContent = data.female + ' female';
-          countMale.style.display   = data.male   != null ? 'inline-block' : 'none';
-          countFemale.style.display = data.female != null ? 'inline-block' : 'none';
-          enteredCountDisplay.style.display = 'inline';
-        })
-        .catch(function(err) {
-          if (err && err.message === 'cancelled') return; // aborted by scan — silently skip
-          countTotal.textContent = 'Error';
-          countMale.style.display = countFemale.style.display = 'none';
-          enteredCountDisplay.style.display = 'inline';
-        })
-        .finally(function() {
-          activeCountCall = null;
-          enteredCountBtn.disabled = false;
-          enteredCountBtn.textContent = 'Entered Count';
-        });
+      var entries = Object.values(scanCache).filter(function(e) { return e.entered === 'yes'; });
+      var total = entries.length;
+
+      // Group by gender value (whatever values the sheet uses)
+      var byGender = {};
+      entries.forEach(function(e) {
+        if (e.gender) byGender[e.gender] = (byGender[e.gender] || 0) + 1;
+      });
+      var genders = Object.keys(byGender).sort();
+
+      countTotal.textContent = total + ' total';
+      if (genders[0] != null) {
+        countMale.textContent = byGender[genders[0]] + ' ' + genders[0];
+        countMale.style.display = 'inline-block';
+      } else {
+        countMale.style.display = 'none';
+      }
+      if (genders[1] != null) {
+        countFemale.textContent = byGender[genders[1]] + ' ' + genders[1];
+        countFemale.style.display = 'inline-block';
+      } else {
+        countFemale.style.display = 'none';
+      }
+      enteredCountDisplay.style.display = 'inline';
     });
     soundToggle.addEventListener('change', function() {
       initAudio();
@@ -1143,7 +1144,6 @@
     let cacheLoaded = false;
     let syncInterval = null;
     let activeSyncCall  = null;  // in-flight getSnapshot call — cancelled when a scan fires
-    let activeCountCall = null;  // in-flight getEnteredCount call — cancelled when a scan fires
 
     const syncBar   = document.getElementById('sync-bar');
     const syncLabel = document.getElementById('sync-label');
@@ -1189,6 +1189,7 @@
                   scanCache[guid].entered   = data[guid].entered;
                   scanCache[guid].entryTime = data[guid].entryTime;
                   scanCache[guid].entryBy   = data[guid].entryBy;
+                  scanCache[guid].gender    = data[guid].gender;
                 } else {
                   scanCache[guid] = data[guid];
                 }
@@ -1638,9 +1639,8 @@
           lastScannedGuid = code.data;
           cooldown = true;
 
-          // Abort any in-flight background calls so GAS is free to handle this scan
-          if (activeSyncCall)  { activeSyncCall.cancel();  activeSyncCall = null; setSyncState('idle'); }
-          if (activeCountCall) { activeCountCall.cancel(); activeCountCall = null; }
+          // Abort any in-flight background sync so GAS is free to handle this scan
+          if (activeSyncCall) { activeSyncCall.cancel(); activeSyncCall = null; setSyncState('idle'); }
 
           initAudio();
           if (navigator.vibrate) navigator.vibrate(100);
