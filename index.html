@@ -1098,12 +1098,14 @@
           countMale.style.display   = data.male   != null ? 'inline-block' : 'none';
           countFemale.style.display = data.female != null ? 'inline-block' : 'none';
           enteredCountDisplay.style.display = 'inline';
+          setTimeout(function() { enteredCountDisplay.style.display = 'none'; }, 5000);
         })
         .catch(function(err) {
           if (err && err.message === 'cancelled') return; // aborted by scan — silently skip
           countTotal.textContent = 'Error';
           countMale.style.display = countFemale.style.display = 'none';
           enteredCountDisplay.style.display = 'inline';
+          setTimeout(function() { enteredCountDisplay.style.display = 'none'; }, 3000);
         })
         .finally(function() {
           activeCountCall = null;
