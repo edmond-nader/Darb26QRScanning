@@ -797,28 +797,32 @@
     // JSONP — no CORS issues. GAS doGet returns: cbName({...})
     // The <script> tag executes it, our window[cbName] callback fires.
     function gasCall(payload) {
+      var cleanupFn = null;
+      var rejectFn  = null;
       var cancelled = false;
+
       var promise = new Promise(function(resolve, reject) {
+        rejectFn = reject;
         var cbName = '_cb' + Date.now() + Math.random().toString(36).slice(2);
         var script = document.createElement('script');
 
         var timer = setTimeout(function() {
-          cleanup();
+          cleanupFn();
           reject(new Error('Request timed out'));
         }, 20000);
 
-        function cleanup() {
+        cleanupFn = function() {
           clearTimeout(timer);
           delete window[cbName];
           if (script.parentNode) script.parentNode.removeChild(script);
-        }
+        };
 
         window[cbName] = function(data) {
-          if (cancelled) { cleanup(); return; }
-          cleanup();
+          if (cancelled) { cleanupFn(); return; }
+          cleanupFn();
           resolve(data);
         };
-        script.onerror = function() { cleanup(); if (!cancelled) reject(new Error('Network error')); };
+        script.onerror = function() { cleanupFn(); if (!cancelled) reject(new Error('Network error')); };
 
         var params = Object.assign({}, payload, { cb: cbName });
         script.src = GAS_URL + '?' + Object.keys(params).map(function(k) {
@@ -828,7 +832,13 @@
         document.body.appendChild(script);
       });
 
-      promise.cancel = function() { cancelled = true; };
+      // cancel() cleans up the script tag AND rejects the promise so .finally() still fires
+      promise.cancel = function() {
+        if (cancelled) return;
+        cancelled = true;
+        if (cleanupFn) cleanupFn();
+        if (rejectFn)  rejectFn(new Error('cancelled'));
+      };
       return promise;
     }
     // ──────────────────────────────────────────────────────────────────────────
@@ -1079,7 +1089,8 @@
     enteredCountBtn.addEventListener('click', function() {
       enteredCountBtn.disabled = true;
       enteredCountBtn.textContent = '...';
-      gasCall({ action: 'getEnteredCount' })
+      activeCountCall = gasCall({ action: 'getEnteredCount' });
+      activeCountCall
         .then(function(data) {
           countTotal.textContent = data.total + ' total';
           countMale.textContent  = data.male + ' male';
@@ -1088,12 +1099,14 @@
           countFemale.style.display = data.female != null ? 'inline-block' : 'none';
           enteredCountDisplay.style.display = 'inline';
         })
-        .catch(function() {
+        .catch(function(err) {
+          if (err && err.message === 'cancelled') return; // aborted by scan — silently skip
           countTotal.textContent = 'Error';
           countMale.style.display = countFemale.style.display = 'none';
           enteredCountDisplay.style.display = 'inline';
         })
         .finally(function() {
+          activeCountCall = null;
           enteredCountBtn.disabled = false;
           enteredCountBtn.textContent = 'Entered Count';
         });
@@ -1129,7 +1142,8 @@
     let scanCache = {};     // { guid: { row, name, entered } }
     let cacheLoaded = false;
     let syncInterval = null;
-    let activeSyncCall = null;   // in-flight getSnapshot call — cancelled when a scan fires
+    let activeSyncCall  = null;  // in-flight getSnapshot call — cancelled when a scan fires
+    let activeCountCall = null;  // in-flight getEnteredCount call — cancelled when a scan fires
 
     const syncBar   = document.getElementById('sync-bar');
     const syncLabel = document.getElementById('sync-label');
@@ -1183,11 +1197,10 @@
               setTimeout(function() { setSyncState('idle'); }, 2000);
               if (debugMode) logDebug('Cache synced: ' + Object.keys(data).length + ' entries');
             })
-            .catch(function() {
-              if (!activeSyncCall || !activeSyncCall.cancelled) {
-                setSyncState('error');
-                setTimeout(function() { setSyncState('idle'); }, 3000);
-              }
+            .catch(function(err) {
+              if (err && err.message === 'cancelled') { setSyncState('idle'); return; }
+              setSyncState('error');
+              setTimeout(function() { setSyncState('idle'); }, 3000);
             })
             .finally(function() { activeSyncCall = null; scheduleSync(); });
         }, 10000); // 10s between syncs — reduces contention with scans
@@ -1625,12 +1638,9 @@
           lastScannedGuid = code.data;
           cooldown = true;
 
-          // Abort any in-flight background sync so GAS is free to handle this scan
-          if (activeSyncCall) {
-            activeSyncCall.cancel();
-            activeSyncCall = null;
-            setSyncState('idle');
-          }
+          // Abort any in-flight background calls so GAS is free to handle this scan
+          if (activeSyncCall)  { activeSyncCall.cancel();  activeSyncCall = null; setSyncState('idle'); }
+          if (activeCountCall) { activeCountCall.cancel(); activeCountCall = null; }
 
           initAudio();
           if (navigator.vibrate) navigator.vibrate(100);
