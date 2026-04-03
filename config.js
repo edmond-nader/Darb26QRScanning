@@ -7,6 +7,6 @@ var DAY_URLS = {
   'Wednesday 2': 'YOUR_WED2_URL_HERE',
   'Thursday 1':  'https://script.google.com/macros/s/AKfycbztaebaWfOeszc6f7ukykQHUO6ysUWko5Zsttai-CUfoadM6sWQIGkBiXp1-qeQwXwV/exec',
   'Thursday 2':  'https://script.google.com/macros/s/AKfycbwHmYe3VrRV-MOvngfBfgkm0kEEEo8AYUuRvXCbkeF4BksEwqrEyOZjSbgSgavG3Dpo/exec',
-  'Friday 1':    'https://script.google.com/macros/s/AKfycbzZVoKlzQFDbZWxl3fzLMhFy4fh8270SR11yi50BkLFvYd5CVTy8m1yem0-o-95Oa1k/exec',
-  'Friday 2':    'https://script.google.com/macros/s/AKfycbx9zNPDMENlNhCpE4q-XPHHq6l5v0Ag5hFgRYXo9rBHkpGICFMxS0QMdjvrP4sXmLiDIg/exec'
+  'Friday 1':    'https://script.google.com/macros/s/AKfycbzFu2oM0P5gLsYH5tluzPfk_kPVr0os9o75p6K3-yw6Pqz1xQ8MUyxe5_gQqUy5GJF5dA/exec',
+  'Friday 2':    'https://script.google.com/macros/s/AKfycbyo1fBXoTuwTyr-GT_ysQ8cUQXn95BEbZGKIrQiKPDTs7MyI9Q5VTPtHJrmuwqhkiQQ9w/exec'
 };
