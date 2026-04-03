@@ -258,6 +258,17 @@
       font-size: 12px;
       cursor: pointer;
     }
+    .count-badge {
+      display: inline-block;
+      background: #1976d2;
+      color: #fff;
+      border-radius: 12px;
+      padding: 2px 10px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
 
     .manual-entry {
       display: flex;
@@ -732,6 +743,10 @@
     <div class="recent-scans">
       <h2>
         Recent Scans
+        <button class="small-button" id="entered-count-btn">Entered Count</button>
+        <span id="entered-count-display" style="display:none;">
+          <span class="count-badge" id="count-total"></span><span class="count-badge" id="count-male" style="background:#1565c0;display:none;"></span><span class="count-badge" id="count-female" style="background:#6a1b9a;display:none;"></span>
+        </span>
         <button class="small-button" id="toggle-debug">Debug Mode</button>
       </h2>
       <div class="scan-list" id="scan-list">
@@ -1054,6 +1069,35 @@
     });
     flashlightBtn.addEventListener('click', toggleFlashlight);
     toggleDebugBtn.addEventListener('click', toggleDebugMode);
+
+    // Entered count button
+    const enteredCountBtn     = document.getElementById('entered-count-btn');
+    const enteredCountDisplay = document.getElementById('entered-count-display');
+    const countTotal          = document.getElementById('count-total');
+    const countMale           = document.getElementById('count-male');
+    const countFemale         = document.getElementById('count-female');
+    enteredCountBtn.addEventListener('click', function() {
+      enteredCountBtn.disabled = true;
+      enteredCountBtn.textContent = '...';
+      gasCall({ action: 'getEnteredCount' })
+        .then(function(data) {
+          countTotal.textContent = data.total + ' total';
+          countMale.textContent  = data.male + ' male';
+          countFemale.textContent = data.female + ' female';
+          countMale.style.display   = data.male   != null ? 'inline-block' : 'none';
+          countFemale.style.display = data.female != null ? 'inline-block' : 'none';
+          enteredCountDisplay.style.display = 'inline';
+        })
+        .catch(function() {
+          countTotal.textContent = 'Error';
+          countMale.style.display = countFemale.style.display = 'none';
+          enteredCountDisplay.style.display = 'inline';
+        })
+        .finally(function() {
+          enteredCountBtn.disabled = false;
+          enteredCountBtn.textContent = 'Entered Count';
+        });
+    });
     soundToggle.addEventListener('change', function() {
       initAudio();
       if (debugMode) logDebug('Sound ' + (this.checked ? 'enabled' : 'disabled'));
