@@ -8,5 +8,5 @@ var DAY_URLS = {
   'Thursday 1':  'https://script.google.com/macros/s/AKfycbztaebaWfOeszc6f7ukykQHUO6ysUWko5Zsttai-CUfoadM6sWQIGkBiXp1-qeQwXwV/exec',
   'Thursday 2':  'https://script.google.com/macros/s/AKfycbwHmYe3VrRV-MOvngfBfgkm0kEEEo8AYUuRvXCbkeF4BksEwqrEyOZjSbgSgavG3Dpo/exec',
   'Friday 1':    'https://script.google.com/macros/s/AKfycbzZVoKlzQFDbZWxl3fzLMhFy4fh8270SR11yi50BkLFvYd5CVTy8m1yem0-o-95Oa1k/exec',
-  'Friday 2':    'YOUR_FRI2_URL_HERE'
+  'Friday 2':    'https://script.google.com/macros/s/AKfycbzxNpsVLbIrxSQg6fLVSxeEFe1g29U9IRWY2UYB5K78zu5i2DLs2h6z9IrB8dbp_HQsNA/exec'
 };
